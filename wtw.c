@@ -66,18 +66,18 @@ start_cmd(void)
 
 	cmdpid = fork();
 	switch (cmdpid) {
-	case -1:
-		perror("fork");
-		return 1;
-	case 0:
-		close(fds[0]);
-		dup2(fds[1], STDOUT_FILENO);
-		setpgid(0, 0);
-		execvp(cmd[0], cmd);
-		perror("execvp");
-		exit(EXIT_FAILURE);
-	default:
-		break;
+		case -1:
+			perror("fork");
+			return 1;
+		case 0:
+			close(fds[0]);
+			dup2(fds[1], STDOUT_FILENO);
+			setpgid(0, 0);
+			execvp(cmd[0], cmd);
+			perror("execvp");
+			exit(EXIT_FAILURE);
+		default:
+			break;
 	}
 
 	close(fds[1]);
@@ -201,13 +201,13 @@ render(void)
 
 static void
 layer_surface_configure(void *data, struct zwlr_layer_surface_v1 *surface,
-                        uint32_t serial, uint32_t w, uint32_t h)
+			uint32_t serial, uint32_t w, uint32_t h)
 {
-    width = w;
-    height = h;
-    zwlr_layer_surface_v1_ack_configure(surface, serial);
+	width = w;
+	height = h;
+	zwlr_layer_surface_v1_ack_configure(surface, serial);
 
-    last_configured = 1;
+	last_configured = 1;
 }
 
 static void
@@ -217,8 +217,8 @@ layer_surface_closed(void *data, struct zwlr_layer_surface_v1 *layer_surface)
 }
 
 static const struct zwlr_layer_surface_v1_listener layer_surface_listener = {
-    .configure = &layer_surface_configure,
-    .closed = &layer_surface_closed,
+	.configure = &layer_surface_configure,
+	.closed = &layer_surface_closed,
 };
 
 static void
@@ -235,7 +235,7 @@ registry_global(void *data, struct wl_registry *wl_registry,
 
 static void
 registry_global_remove(void *data,
-		struct wl_registry *wl_registry, uint32_t name)
+		       struct wl_registry *wl_registry, uint32_t name)
 {
 }
 
@@ -290,15 +290,15 @@ setup(void)
 
 	surface = wl_compositor_create_surface(compositor);
 	layer_surface = zwlr_layer_shell_v1_get_layer_surface(layer_shell, surface,
-		NULL, ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM, "wtw");
+						       NULL, ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM, "wtw");
 	zwlr_layer_surface_v1_add_listener(layer_surface,
-		&layer_surface_listener, NULL);
-    zwlr_layer_surface_v1_set_exclusive_zone(layer_surface, -1);
+				    &layer_surface_listener, NULL);
+	zwlr_layer_surface_v1_set_exclusive_zone(layer_surface, -1);
 	zwlr_layer_surface_v1_set_size(layer_surface, width, height);
 	zwlr_layer_surface_v1_set_anchor(layer_surface,
-		ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
-		((width && height) ? 0 :
-		ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM));
+				  ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
+				  ((width && height) ? 0 :
+				  ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM));
 	wl_surface_commit(surface);
 
 	return 0;
@@ -313,90 +313,90 @@ run(void)
 		{ .fd = signal_fd,                  .events = POLLIN },
 		{ .fd = -1,                         .events = POLLIN },
 	};
-	
+
 	restart = running = true;
-    bool did_forced_redraw = false;
-    while (running) {
-        if (wl_display_prepare_read(display) < 0) {
-            if (wl_display_dispatch_pending(display) < 0) {
-                perror("wl_display_dispatch_pending");
-                break;
-            }
-        }
+	bool did_forced_redraw = false;
+	while (running) {
+		if (wl_display_prepare_read(display) < 0) {
+			if (wl_display_dispatch_pending(display) < 0) {
+				perror("wl_display_dispatch_pending");
+				break;
+			}
+		}
 
-        wl_display_flush(display);
+		wl_display_flush(display);
 
-        if (restart && cmdpid == 0 && !inputf) {
-            restart = false;
-            start_cmd();
-        }
+		if (restart && cmdpid == 0 && !inputf) {
+			restart = false;
+			start_cmd();
+		}
 
-        fds[2].fd = inputf ? fileno(inputf) : -1;
+		fds[2].fd = inputf ? fileno(inputf) : -1;
 
-        int poll_timeout = -1;
-        if (period == 0) {
-            poll_timeout = did_forced_redraw ? -1 : 100;
-        }
+		int poll_timeout = -1;
+		if (period == 0) {
+			poll_timeout = did_forced_redraw ? -1 : 100;
+		}
 
-        if (poll(fds, 3, poll_timeout) < 0) {
-            perror("poll");
-            return EXIT_FAILURE;
-        }
+		if (poll(fds, 3, poll_timeout) < 0) {
+			perror("poll");
+			return EXIT_FAILURE;
+		}
 
-        if (period == 0 && !did_forced_redraw && last_configured && text && len > 0) {
-            render();
-            did_forced_redraw = true;
-        }
+		if (period == 0 && !did_forced_redraw && last_configured && text && len > 0) {
+			render();
+			did_forced_redraw = true;
+		}
 
-        if (fds[1].revents & POLLIN) {
-            ssize_t n = read(signal_fd, &si, sizeof(si));
-            if (n != sizeof(si))
-                perror("signalfd");
-            if (si.ssi_signo == SIGCHLD) {
-                reap();
-                if (period < 0)
-                    restart = true;
-                else if (!restart)
-                    alarm(period);
-            } else if (si.ssi_signo == SIGALRM && cmdpid == 0)
-                restart = true;
-            else
-                return EXIT_FAILURE;
-        }
+		if (fds[1].revents & POLLIN) {
+			ssize_t n = read(signal_fd, &si, sizeof(si));
+			if (n != sizeof(si))
+				perror("signalfd");
+			if (si.ssi_signo == SIGCHLD) {
+				reap();
+				if (period < 0)
+					restart = true;
+				else if (!restart)
+					alarm(period);
+			} else if (si.ssi_signo == SIGALRM && cmdpid == 0)
+				restart = true;
+			else
+				return EXIT_FAILURE;
+		}
 
-        /* Command error */
-        if (fds[2].revents & POLLHUP) {
-            inputf = NULL;
-            if (period != 0) // Only exit if polling is enabled
-                return EXIT_FAILURE;
-            // else: keep running to keep the window alive
-        }
+		/* Command error */
+		if (fds[2].revents & POLLHUP) {
+			inputf = NULL;
+			if (period != 0) // Only exit if polling is enabled
+				return EXIT_FAILURE;
+			// else: keep running to keep the window alive
+		}
 
-        if (inputf && fds[2].revents & POLLIN) {
-            if (read_text() < 0) {
-                if (period != 0)
-                    return EXIT_FAILURE;
-                inputf = NULL;
-            } else if (last_configured) {
-                render();
-            }
-        }
+		if (inputf && fds[2].revents & POLLIN) {
+			if (read_text() < 0) {
+				if (period != 0)
+					return EXIT_FAILURE;
+				inputf = NULL;
+			} else if (last_configured) {
+				render();
+			}
+		}
 
-        if (!(fds[0].revents & POLLIN)) {
-            wl_display_cancel_read(display);
-            continue;
-        }
+		if (!(fds[0].revents & POLLIN)) {
+			wl_display_cancel_read(display);
+			continue;
+		}
 
-        if (wl_display_read_events(display) < 0) {
-            perror("wl_display_read_events");
-            return EXIT_FAILURE;
-        }
+		if (wl_display_read_events(display) < 0) {
+			perror("wl_display_read_events");
+			return EXIT_FAILURE;
+		}
 
-        if (wl_display_dispatch_pending(display) < 0) {
-            perror("wl_display_dispatch_pending");
-            return EXIT_FAILURE;
-        }
-    }
+		if (wl_display_dispatch_pending(display) < 0) {
+			perror("wl_display_dispatch_pending");
+			return EXIT_FAILURE;
+		}
+	}
 
 	return EXIT_SUCCESS;
 }
@@ -433,21 +433,21 @@ main(int argc, char *argv[])
 
 	while ((opt = getopt(argc, argv, "b:c:f:p:P:vw:h:x:y:")) != -1) {
 		switch (opt) {
-		case 'b':
-		case 'c':
-			scheme[opt == 'b' ? ColBg : ColFg] = strtoul(optarg, NULL, 16);
-			break;
-		case 'f': font_name = optarg; break;
-		case 'p': period = atoi(optarg); break;
-		case 'P': pad = atoi(optarg); break;
-		case 'v': puts("wtw " VERSION); return EXIT_SUCCESS;
-		case 'w': width = atoi(optarg); break;
-		case 'h': height = atoi(optarg); break;
-		case 'x': x = atoi(optarg); break;
-		case 'y': y = atoi(optarg); break;
-		default:
-			fprintf(stderr, usage);
-			return ret;
+			case 'b':
+			case 'c':
+				scheme[opt == 'b' ? ColBg : ColFg] = strtoul(optarg, NULL, 16);
+				break;
+			case 'f': font_name = optarg; break;
+			case 'p': period = atoi(optarg); break;
+			case 'P': pad = atoi(optarg); break;
+			case 'v': puts("wtw " VERSION); return EXIT_SUCCESS;
+			case 'w': width = atoi(optarg); break;
+			case 'h': height = atoi(optarg); break;
+			case 'x': x = atoi(optarg); break;
+			case 'y': y = atoi(optarg); break;
+			default:
+				fprintf(stderr, usage);
+				return ret;
 		}
 	}
 	argv += optind;
