@@ -14,7 +14,7 @@ static int x = 20;
 static int y = 50;
 
 /* behavior */
-static int period = 5;
+static int period = 0;
 
 /*
  * Delimeter string, encountered as a separate line in subcommand output,
