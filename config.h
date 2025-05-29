@@ -4,14 +4,14 @@
 static int pad = 10;
 static const char *font_name = "monospace:size=12:dpi=96";
 static uint32_t scheme[2] = {
-	[ColFg] = 0xbbbbbbff,
-	[ColBg] = 0x000000ff,
+	[ColFg] = 0xebdbb2ff,
+	[ColBg] = 0x181716aa,
 };
 
 static int32_t width = 0;
 static int32_t height = 0;
-static int x = 0;
-static int y = 0;
+static int x = 20;
+static int y = 50;
 
 /* behavior */
 static int period = 5;

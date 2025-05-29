@@ -48,6 +48,8 @@ static size_t cap;
 static bool restart = false;
 static bool running = false;
 
+static int last_configured = 0;
+
 static int
 start_cmd(void)
 {
@@ -201,9 +203,11 @@ static void
 layer_surface_configure(void *data, struct zwlr_layer_surface_v1 *surface,
                         uint32_t serial, uint32_t w, uint32_t h)
 {
-	width = w;
-	height = h;
-	zwlr_layer_surface_v1_ack_configure(surface, serial);
+    width = w;
+    height = h;
+    zwlr_layer_surface_v1_ack_configure(surface, serial);
+
+    last_configured = 1;
 }
 
 static void
@@ -311,6 +315,8 @@ run(void)
 	};
 	
 	restart = running = true;
+    bool polled_once = false;
+    bool forced_redraw = false;
 	while (running) {
 		if (wl_display_prepare_read(display) < 0) {
 			if (wl_display_dispatch_pending(display) < 0) {
@@ -328,10 +334,25 @@ run(void)
 
 		fds[2].fd = inputf ? fileno(inputf) : -1;
 
-		if (poll(fds, 3, -1) < 0) {
-			perror("poll");
-			return EXIT_FAILURE;
-		}
+		int poll_timeout = -1;
+        if (period == 0) {
+            poll_timeout = polled_once ? 0 : 100;
+        }
+
+        if (poll(fds, 3, poll_timeout) < 0) {
+            perror("poll");
+            return EXIT_FAILURE;
+        }
+
+        if (period == 0 && !polled_once)
+            polled_once = true;
+
+        // After first poll, force a redraw after 100ms to catch scale update
+        if (period == 0 && polled_once && !forced_redraw && last_configured && text && len > 0) {
+            usleep(100000); // 100ms
+            render();
+            forced_redraw = true;
+        }
 
 		if (fds[1].revents & POLLIN) {
 			ssize_t n = read(signal_fd, &si, sizeof(si));
@@ -352,13 +373,19 @@ run(void)
 		/* Command error */
 		if (fds[2].revents & POLLHUP) {
 			inputf = NULL;
-			return EXIT_FAILURE;
+			if (period != 0) // Only exit if polling is enabled
+                return EXIT_FAILURE;
+            // else: keep running to keep the window alive
 		}
 
 		if (inputf && fds[2].revents & POLLIN) {
-			if (read_text() < 0)
-				return EXIT_FAILURE;
-			render();
+            if (read_text() < 0) {
+                if (period != 0)
+                    return EXIT_FAILURE;
+                inputf = NULL;
+            } else if (last_configured) {
+                render();
+            }
 		}
 
 		if (!(fds[0].revents & POLLIN)) {
